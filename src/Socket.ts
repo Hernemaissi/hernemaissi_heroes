@@ -2,12 +2,18 @@ import * as webSocket from 'ws';
 import * as _ from 'lodash';
 
 import { initPlayer, Player} from './Player';
-import { SCENES } from './Scene';
+import { SCENES, BattleScene } from './Scene';
 import * as shop from './Shop';
+import { ENEMY_LIST } from './Enemy';
+import { Troop } from './Troop';
+import { Battle, handlePlayerAction } from './Battle';
 
 interface Message {
     id: string;
     message: string;
+    extra?: {
+        target: number,
+    }
 }
 
 let index = 1;
@@ -77,6 +83,25 @@ export function initSocket(wss: webSocket.Server) {
                         }
                         break;
                     }
+                    case 'battleaction': {
+                        const player = sockets[id];
+                        const extra = receivedMessage.extra;
+                        if (!extra || !extra.hasOwnProperty('target')) {
+                            console.log('Missing extras');
+                            ws.send(JSON.stringify({id: 'error', message: 'Unknown message'}));
+                            break;
+                        }
+                        if (player.currentScene.name !== 'battle') {
+                            console.log('Wrong scene');
+                            ws.send(JSON.stringify({id: 'error', message: 'Unknown message'}));
+                            break;                                       
+                        }
+                        let battle = player.currentScene.battle;
+                        handlePlayerAction(player, receivedMessage.message, extra.target, battle);
+                        sockets[id] = player;
+                        ws.send(JSON.stringify({ id: 'status', message: player }));
+                        break;
+                    }
                     default:
                         ws.send('Unknown id');
                         break;
@@ -102,6 +127,7 @@ export function initSocket(wss: webSocket.Server) {
 function handleAction(action: string, player: Player): Player | null {
     const allowedActions = player.currentScene.allowedActions;
     if (_.indexOf(allowedActions, action) === -1) {
+        console.log('given action not on list of allowable actions');
         return null;
     }
     let newPlayer = _.cloneDeep(player);
@@ -112,6 +138,10 @@ function handleAction(action: string, player: Player): Player | null {
         case 'adventure': {
             return handleSceneChange(newPlayer, action);
         }
+        case 'battle': {
+            const troop: Troop = { members: [_.cloneDeep(ENEMY_LIST[0]), _.cloneDeep(ENEMY_LIST[0])]}
+            return handleBattleInit(newPlayer, troop)
+        }
         default:
             return null;
     }
@@ -120,6 +150,21 @@ function handleAction(action: string, player: Player): Player | null {
 function handleSceneChange(player: Player, scene: string): Player {
     const oldScene = player.currentScene;
     player.currentScene = SCENES[scene];
+    player.previousScene = oldScene;
+    return player;
+}
+
+function handleBattleInit(player: Player, troop: Troop): Player {
+    const oldScene = player.currentScene;
+    let battle: Battle = {
+        troop: troop,
+    };
+    const newScene: BattleScene = {
+        name: 'battle',
+        allowedActions: ['attack'],
+        battle: battle,
+    }
+    player.currentScene = newScene;
     player.previousScene = oldScene;
     return player;
 }

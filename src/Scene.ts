@@ -1,16 +1,25 @@
 import { Actions } from './Player';
+import { Battle } from './Battle';
 
-export interface Scene {
-    name: string;
+export interface BasicScene {
+    name: 'town' | 'shop' | 'adventure' | 'start';
     allowedActions: Actions[];
     allowedTransitions: Scene[];
 }
 
-export const SCENES: {[name: string]: Scene} = {
+export interface BattleScene  {
+    name: 'battle',
+    allowedActions: Actions[];
+    battle: Battle;
+}
+
+export type Scene = BasicScene | BattleScene
+
+export const SCENES: { [name: string]: Scene } = {
     town:
         {
             name: 'town',
-            allowedActions: ['shop', 'adventure'],
+            allowedActions: ['shop', 'adventure', 'battle'],
             allowedTransitions: []
         },
     shop:
@@ -25,4 +34,4 @@ export const SCENES: {[name: string]: Scene} = {
             allowedActions: ['shop', 'adventure'],
             allowedTransitions: []
         }
-    }
+}
